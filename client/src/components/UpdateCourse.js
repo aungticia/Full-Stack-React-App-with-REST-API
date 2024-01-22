@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useContext} from "react";
+import { useState, useEffect, useRef, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../utils/apiHelper";
-import UserContext from "../context/UserContext"; 
+import UserContext from "../context/UserContext";
 import ErrorsDisplay from "./ErrorsDisplay";
 
 const UpdateCourse = () => {
@@ -13,64 +13,84 @@ const UpdateCourse = () => {
 
     // state
     const title = useRef(null);
-    const description = useRef(null); 
+    const description = useRef(null);
     const estimatedTime = useRef(null);
     const materialsNeeded = useRef(null);
 
-    // fetches the course to update 
+    // fetches the course to update
     useEffect(() => {
         const fetchData = async () => {
-            const response = await api("/courses/" + id, "GET", "");
-            if (response.status === 200) {
-                const courseDetail = await response.json();
-                setCourse(courseDetail);
-            } else if (response.status === 403) {
-                navigate('/forbidden');
-            } else if (response.status === 404) {
-                navigate('/notfound');
-            } else {
-                throw new Error();
+            try {
+                const response = await api(`/courses/${id}`, "GET", "");
+                if (response.status === 200) {
+                    try {
+                        const courseDetail = await response.json();
+                        setCourse(courseDetail);
+
+                        const { userId } = courseDetail;
+                        // Check if the authenticated user is the owner of the course
+                        if (authUser && userId !== authUser.id) {
+                            navigate('/forbidden');
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        navigate('/error');
+                    }
+                } else if (!authUser && response.status === 403) {
+                    navigate('/forbidden');
+                } else if (response.status === 404) {
+                    navigate('/notfound');
+                } else if (response.status === 500) {
+                    // Redirect to /error path for '500 Internal Server Error'
+                    navigate('/error');
+                } else {
+                    throw new Error();
+                }
+            } catch (error) {
+                console.error(error);
+                navigate('/error');
             }
         };
-        fetchData(); 
-    }, [id, navigate]);
 
-    // event handlers 
+        fetchData();
+    }, [id, navigate, authUser]);
+
+    // event handlers
     const handleUpdate = async (event) => {
         event.preventDefault();
 
         // creates a new course json for the updated course
         const courseUpdate = {
-            title: title.current.value, 
+            title: title.current.value,
             description: description.current.value,
             estimatedTime: estimatedTime.current.value,
             materialsNeeded: materialsNeeded.current.value,
-            userId: authUser.id
-        }
+            userId: authUser.id,
+        };
 
         // sends a put request to the api to update course
         try {
-            const response = await api("/courses/" + id, "PUT", courseUpdate, authUser);
+            const response = await api(`/courses/${id}`, "PUT", courseUpdate, authUser);
             if (response.status === 204) {
                 console.log("Course was successfully updated");
-                navigate("/courses/" + id); 
+                navigate(`/courses/${id}`);
             } else if (response.status === 400) {
                 const data = await response.json();
                 setErrors(data.errors);
-            }  else {
-                throw new Error(); 
+            } else {
+                throw new Error();
             }
-        } catch(error) {
-            console.log(error);
+        } catch (error) {
+            console.error(error);
             navigate('/error');
         }
-    }
+    };
 
-    // event listener function for cancel button 
+    // event listener function for cancel button
     const handleCancel = (event) => {
         event.preventDefault();
         navigate('/');
-    }
+    };
 
     return (
         <main>
@@ -81,37 +101,42 @@ const UpdateCourse = () => {
                     <div className="main--flex">
                         <div>
                             <label htmlFor="courseTitle">Course Title</label>
-                            <input 
-                                id="courseTitle" 
-                                name="courseTitle" 
-                                type="text" 
+                            <input
+                                id="courseTitle"
+                                name="courseTitle"
+                                type="text"
                                 ref={title}
-                                defaultValue={course?.title} />
-                            <p>{course?.student.firstName} {course?.student.lastName}</p>
+                                defaultValue={course?.title}
+                            />
+                            <p>{course?.student?.firstName} {course?.student?.lastName}</p>
                             <label htmlFor="courseDescription">Course Description</label>
-                            <textarea 
-                                id="courseDescription" 
-                                name="courseDescription" 
+                            <textarea
+                                id="courseDescription"
+                                name="courseDescription"
                                 ref={description}
-                                defaultValue={course?.description} />
+                                defaultValue={course?.description}
+                            />
                         </div>
                         <div>
                             <label htmlFor="estimatedTime">Estimated Time</label>
-                            <input 
-                                id="estimatedTime" 
-                                name="estimatedTime" 
-                                type="text" 
+                            <input
+                                id="estimatedTime"
+                                name="estimatedTime"
+                                type="text"
                                 ref={estimatedTime}
-                                defaultValue={course?.estimatedTime} />
+                                defaultValue={course?.estimatedTime}
+                            />
                             <label htmlFor="materialsNeeded">Materials Needed</label>
-                            <textarea 
-                                id="materialsNeeded" 
-                                name="materialsNeeded" 
+                            <textarea
+                                id="materialsNeeded"
+                                name="materialsNeeded"
                                 ref={materialsNeeded}
-                                defaultValue={course?.materialsNeeded} />
+                                defaultValue={course?.materialsNeeded}
+                            />
                         </div>
                     </div>
-                    <button className="button" type="submit">Update Course</button><button className="button button-secondary" onClick={handleCancel}>Cancel</button>
+                    <button className="button" type="submit">Update Course</button>
+                    <button className="button button-secondary" onClick={handleCancel}>Cancel</button>
                 </form>
             </div>
         </main>
